@@ -21,7 +21,10 @@ import androidx.activity.compose.setContent
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
@@ -56,12 +59,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -127,12 +133,44 @@ fun PuppyGrid(
                 Row {
                     for (columnIndex in 0 until columns) {
                         val itemIndex = index * columns + columnIndex
+                        var itemAnim by remember { mutableStateOf(false) }
+                        val itemAnimTransition = updateTransition(targetState = itemAnim)
+                        val itemAnimTranslation by itemAnimTransition.animateFloat(
+                            transitionSpec = {
+                                tween(easing = FastOutSlowInEasing)
+                            }
+                        ) {
+                            if (it) 0F else 150F
+                        }
+                        val itemAnimAlpha by itemAnimTransition.animateFloat(
+                            transitionSpec = {
+                                tween(easing = LinearEasing)
+                            }
+                        ) {
+                            if (it) 1F else 0.45F
+                        }
+                        val itemAnimScale by itemAnimTransition.animateFloat(
+                            transitionSpec = {
+                                tween(easing = FastOutSlowInEasing)
+                            }
+                        ) {
+                            if (it) 1F else 0.85F
+                        }
                         if (itemIndex < data.size) ItemPuppy(
                             puppy = data[itemIndex],
                             modifier = Modifier
                                 .padding(8.dp)
-                                .weight(weight = 1f, fill = true),
-                            onClick = { navController.navigate("${Screen.PuppyScreen.route}/$itemIndex") }
+                                .weight(weight = 1f, fill = true)
+                                .onGloballyPositioned {
+                                    if (it.isAttached && !itemAnim) itemAnim = true
+                                }
+                                .graphicsLayer {
+                                    translationX =
+                                        if (columnIndex % columns == 0) itemAnimTranslation else -itemAnimTranslation
+                                }
+                                .alpha(itemAnimAlpha)
+                                .scale(itemAnimScale),
+                            onClick = { navController.navigate("${Screen.PuppyScreen.route}/$itemIndex") },
                         )
                         else Spacer(Modifier.weight(weight = 1f, fill = true))
                     }
@@ -146,7 +184,7 @@ fun PuppyGrid(
 fun ItemPuppy(
     modifier: Modifier = Modifier,
     puppy: Puppy = Puppy(nickName = puppyPhotos.first().first, photo = puppyPhotos.first().second),
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
 ) {
     var isTouchMe by remember { mutableStateOf(false) }
     val transition = updateTransition(targetState = isTouchMe)
@@ -224,7 +262,7 @@ fun PuppyScreenContentTopAppbar(onClick: () -> Unit) {
 fun PuppyScreenContentFloatingActionButton() {
     FloatingActionButton(onClick = { }, modifier = Modifier) {
         Row(modifier = Modifier.padding(start = 8.dp, end = 8.dp)) {
-            Icon(imageVector = Icons.Filled.Add, contentDescription = "Adopt Me")
+            Icon(imageVector = Icons.Filled.Add, contentDescription = "add")
             Text(text = "Adopt Me", style = MaterialTheme.typography.h6)
         }
     }
